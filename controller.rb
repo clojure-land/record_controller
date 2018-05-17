@@ -1,12 +1,13 @@
 require 'pathname'
 require 'fileutils'
 require_relative 'spawn'
+require 'open3'
 
 module RecordController
   class Controller
     include RecordController::Spawn
 
-    attr_accessor :record_video, :record_audio, :playback_audio, :playback_video, :counter, :state
+    attr_accessor :record_video, :record_audio, :playback_audio, :playback_video, :counter, :state, :clipped
 
     DEBUG = false
 
@@ -37,9 +38,9 @@ module RecordController
       @record_video = false
       @playback_audio = true
       @playback_video = false
+      @clipped = false
       set_counter!(last_sequence_number.next)
     end
-
 
     def running?(pid)
       begin
@@ -136,12 +137,43 @@ module RecordController
       end
     end
 
+    def clipped?(file)
+      Open3.popen3("sox", file, "-n", "stat") do |_, out, err, stat, thread|
+        while line = err.gets
+          puts "#{file}   |  #{line}"
+          return true if line =~ /clipped/
+        end
+      end
+    end
+
     def stop!
+      recorded_files = @last_recordings[-@pids.count..-1]
       @pids.each {|pid|
         Process.kill("TERM", pid)
       }
+      while @pids.any? {|pid| running?(pid)}
+        print "."
+        sleep 0.200
+      end
       @pids = []
       @state = :stopped
+      recorded_files.each do |f|
+        if clipped?(f)
+          puts "Clipped! #{f}"
+          @clipped = true
+          ext = File.extname(f)
+          base = File.basename(f, ext)
+          clipped_file =  "#{output_dir}/#{base}-CLIPPED#{ext}"
+          FileUtils.mv(f, clipped_file)
+          @last_recordings = @last_recordings.map do |x|
+            if x == f
+              clipped_file
+            else
+              x
+            end
+          end
+        end
+      end
     end
 
     def screenshot!
@@ -166,6 +198,7 @@ module RecordController
         if f
           puts "Undo #{f}"
           FileUtils.mv(f, "#{trash_dir}/#{File.basename(f)}")
+          @clipped = false
         else
           puts "No more undo history."
         end

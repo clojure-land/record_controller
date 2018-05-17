@@ -1,3 +1,6 @@
+# TODO this is terrible, seems popen4 isn't that widely available, and the
+# return types are completely different (id, in, out, err) vs just (id)
+
 module RecordController
   module Spawn
     def spawn(*args)
@@ -10,7 +13,11 @@ module RecordController
     end
 
     def emacsclient(*args)
-      spawn('/usr/local/bin/emacsclient', '-e', *args)
+      spawn('/usr/local/bin/emacsclient', '-s', 'lambdaisland', '-e', *args)
+    end
+
+    def running?(pid)
+      `kill -0 #{pid} 2>/dev/null ; echo $?`.strip == "0"
     end
 
   end

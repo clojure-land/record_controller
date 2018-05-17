@@ -48,15 +48,28 @@ class ShuttleAdapter
     emacsclient("(setq #{var} #{val})")
   end
 
-  def button_down_1
-    controller.record_audio = !controller.record_audio
-    controller.record_video = !controller.record_video
-    controller.playback_audio = !controller.playback_audio
-    controller.playback_video = !controller.playback_video
+  def button_down_2
+    if controller.record_audio && !controller.record_video
+      controller.record_audio = false
+      controller.record_video = true
+      controller.playback_audio = false
+      controller.playback_video = true
+    elsif !controller.record_audio && controller.record_video
+      controller.record_audio = true
+      controller.record_video = true
+      controller.playback_audio = true
+      controller.playback_video = true
+    else
+      controller.record_audio = true
+      controller.record_video = false
+      controller.playback_audio = true
+      controller.playback_video = false
+    end
+
     update_emacs!
   end
 
-  def button_down_2
+  def button_down_1
     if controller.recording?
       controller.stop!
     elsif controller.stopped?
@@ -90,6 +103,7 @@ class ShuttleAdapter
     emacsclient("(plexus/set-record-counter #{controller.counter})")
     setq("plexus/record-video", controller.record_video)
     setq("plexus/record-audio", controller.record_audio)
+    setq("plexus/record-clipped", controller.clipped)
     setq("plexus/record-state", controller.state)
   end
 end
