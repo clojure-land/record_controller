@@ -27,8 +27,11 @@ module RecordController
       @stopped = false
       Thread.new do
         loop do
+          print "."
+          input = device.read
+          break if input.nil?
           begin
-            handle!(device.read.unpack('C*'))
+            handle!(input.unpack('C*'))
             break if @stopped
           rescue => e
             p e

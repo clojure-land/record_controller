@@ -18,10 +18,17 @@ module RecordController
     VIDEO_CMD2 =  FFMPEG + %W[-i :2] + CODEC
     VIDEO_CMD3 =  FFMPEG + %W[-i :3] + CODEC
 
+    PRELISTEN_PORTS = {"system:capture_1" => "system:playback_1",
+                       "system:capture_2" => "system:playback_2"}
+
     AUDIO_CMD = %w[jack_capture --channels 1 --port system:capture_1]
     SCREENSHOT_CMD = "/home/arne/LambdaIsland/bin/screenshot"
 
-    ALSA_IN_DEVICE="hw:Mic" #"hw:S6USB20"
+    # FocusRite
+    ALSA_IN_DEVICE="hw:S6USB20"
+
+    # USB Mic
+    # ALSA_IN_DEVICE="hw:Mic"
 
     DIR = Pathname(__FILE__).dirname.expand_path
 
@@ -85,7 +92,19 @@ module RecordController
 
     def prepare_video!
       emacsclient("(plexus/screencast-mode)")
-      emacsclient("(set-mouse-absolute-pixel-position 1277 720)")
+      emacsclient("(set-mouse-absolute-pixel-position 1279 719)")
+    end
+
+    def connect_prelisten!
+      PRELISTEN_PORTS.each do |from, to|
+        spawn("jack_connect", from, to)
+      end
+    end
+
+    def disconnect_prelisten!
+      PRELISTEN_PORTS.each do |from, to|
+        spawn("jack_disconnect", from, to)
+      end
     end
 
     def start!
@@ -114,6 +133,7 @@ module RecordController
       # end
 
       if @record_audio
+        connect_prelisten!
         afile = "#{fname % 'A'}.wav"
         pid_audio, _ = spawn_audio(afile)
         @pids << pid_audio
@@ -147,6 +167,7 @@ module RecordController
     end
 
     def stop!
+      disconnect_prelisten!
       recorded_files = @last_recordings[-@pids.count..-1]
       @pids.each {|pid|
         Process.kill("TERM", pid)
@@ -288,14 +309,15 @@ module RecordController
         end
         if str != "n"
           @jack_pid = spawn("/usr/bin/pasuspender", "--", "/usr/bin/jackd", "-dalsa", "-d#{ALSA_IN_DEVICE}", "-r44100", "-p256", "-n2")
+          Thread.new do
+            loop do
+              unless running?(@jack_pid)
+                puts "JACK DIED, EXITING!"
+                exit 1
+              end
+            end
+          end
         end
-      end
-    end
-
-    def record_controller_main
-      loop do
-        @now_playing.compact!
-        sleep 0.7
       end
     end
 

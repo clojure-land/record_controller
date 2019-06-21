@@ -13,7 +13,9 @@ module RecordController
     end
 
     def emacsclient(*args)
-      spawn('/usr/local/bin/emacsclient', '-s', 'lambdaisland', '-e', *args)
+      spawn('/usr/local/bin/emacsclient',
+            #'-s', '/tmp/arne/emacs1000/server',
+            '-e', *args)
     end
 
     def running?(pid)
